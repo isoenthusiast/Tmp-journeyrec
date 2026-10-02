@@ -20,3 +20,6 @@ select { padding: .75rem; border: 1px solid #566681; border-radius: 8px; backgro
 .badge { margin-left: .5rem; padding: .15rem .45rem; border-radius: 999px; background: #33415d; font-size: .75rem; }
 .metadata { display: block; margin-top: .25rem; color: #b6c7e6; font-size: .85rem; }
 .photo-status { flex-basis: 100%; margin: 0; }
+.reading-fields { display: flex; flex-wrap: wrap; gap: .5rem; flex-basis: 100%; }
+.reading-fields label { margin: 0; font-size: .8rem; color: #b6c7e6; }
+.reading-fields input { width: 6rem; display: block; margin-top: .25rem; }

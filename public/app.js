@@ -52,16 +52,30 @@ function render(items) {
     card.append(milestones);
 
     const milestoneForm = document.createElement('form'); milestoneForm.className = 'milestone-form';
-    milestoneForm.innerHTML = `<input name="label" required placeholder="Milestone name"><select name="type" aria-label="Milestone type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select><input name="photo" type="file" accept="image/*" aria-label="Dashboard photo"><button>Add milestone</button><p class="photo-status muted"></p>`;
+    milestoneForm.innerHTML = `<input name="label" required placeholder="Milestone name"><select name="type" aria-label="Milestone type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select><input name="photo" type="file" accept="image/*" aria-label="Dashboard photo"><button type="button" class="extract-photo">Read photo</button><button type="submit">Save milestone</button><div class="reading-fields"><label>Odometer km <input name="odometerKm" inputmode="decimal"></label><label>Battery % <input name="batteryPercent" inputmode="decimal"></label><label>Range km <input name="rangeKm" inputmode="decimal"></label><label>Speed km/h <input name="speedKmh" inputmode="decimal"></label><label>Temperature °C <input name="temperatureC" inputmode="decimal"></label></div><p class="photo-status muted"></p>`;
     const photoStatus = milestoneForm.querySelector('.photo-status');
-    milestoneForm.querySelector('input[type=file]').addEventListener('change', () => { photoStatus.textContent = 'Photo selected; dashboard and EXIF GPS will be read when saved.'; });
+    const photoInput = milestoneForm.querySelector('input[type=file]');
+    const extractButton = milestoneForm.querySelector('.extract-photo');
+    extractButton.addEventListener('click', async () => {
+      const photo = photoInput.files[0];
+      if (!photo?.size) { photoStatus.textContent = 'Choose a dashboard photo first.'; return; }
+      try {
+        extractButton.disabled = true; photoStatus.textContent = 'Reading dashboard and EXIF GPS…';
+        const extracted = await extractPhoto(photo);
+        for (const key of ['odometerKm', 'batteryPercent', 'rangeKm', 'speedKmh', 'temperatureC']) milestoneForm.elements[key].value = extracted.readings[key];
+        milestoneForm.dataset.gps = JSON.stringify(extracted.gps);
+        milestoneForm.dataset.source = 'dashboard-photo';
+        photoStatus.textContent = extracted.gps ? `GPS found in photo metadata: ${extracted.gps.latitude}, ${extracted.gps.longitude}. Review readings, then save.` : 'No GPS metadata found. Review readings, then save.';
+      } catch (error) { photoStatus.textContent = `Photo extraction failed: ${error.message}`; } finally { extractButton.disabled = false; }
+    });
+    photoInput.addEventListener('change', () => { milestoneForm.dataset.gps = ''; milestoneForm.dataset.source = ''; photoStatus.textContent = 'Photo selected. Press Read photo.'; });
     milestoneForm.addEventListener('submit', async (event) => {
-      event.preventDefault(); const data = new FormData(milestoneForm); let extracted = { gps: null, readings: {} };
-      const photo = data.get('photo');
-      if (photo?.size) { try { extracted = await extractPhoto(photo); } catch (error) { message.textContent = `Photo extraction failed: ${error.message}`; return; } }
-      const response = await fetch(`/api/journeys/${item.id}/milestones`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: data.get('label'), type: data.get('type'), source: photo?.size ? 'dashboard-photo' : 'manual', ...extracted }) });
+      event.preventDefault(); const data = new FormData(milestoneForm);
+      const readings = Object.fromEntries(['odometerKm', 'batteryPercent', 'rangeKm', 'speedKmh', 'temperatureC'].map((key) => [key, data.get(key)]).filter(([, value]) => value));
+      const gps = milestoneForm.dataset.gps ? JSON.parse(milestoneForm.dataset.gps) : null;
+      const response = await fetch(`/api/journeys/${item.id}/milestones`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: data.get('label'), type: data.get('type'), source: milestoneForm.dataset.source || 'manual', gps, readings }) });
       const result = await response.json(); if (!response.ok) { message.textContent = result.error || 'Unable to add milestone'; return; }
-      message.textContent = extracted.gps ? 'Milestone added with GPS from photo metadata.' : 'Milestone added; no GPS metadata was found.'; await load();
+      message.textContent = gps ? 'Milestone added with GPS from photo metadata.' : 'Milestone added; no GPS metadata was found.'; await load();
     });
     card.append(milestoneForm); list.append(card);
   }
