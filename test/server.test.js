@@ -25,10 +25,12 @@ test('journeys can be created and listed with milestones', async () => {
 
   const milestone = await fetch(`http://127.0.0.1:${port}/api/journeys/${journey.id}/milestones`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ label: 'Home', type: 'start' })
+    body: JSON.stringify({ label: 'Home', type: 'start', capturedAt: '2026-10-02T08:30:00.000Z' })
   });
   assert.equal(milestone.status, 201);
-  assert.equal((await milestone.json()).type, 'start');
+  const milestoneData = await milestone.json();
+  assert.equal(milestoneData.type, 'start');
+  assert.equal(milestoneData.capturedAt, '2026-10-02T08:30:00.000Z');
 
   const list = await fetch(`http://127.0.0.1:${port}/api/journeys`);
   const listed = await list.json();

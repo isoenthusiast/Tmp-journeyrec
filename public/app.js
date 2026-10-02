@@ -32,9 +32,12 @@ async function extractPhoto(file) {
   const text = ocr.data.text.replace(/\s+/g, ' ');
   const number = (pattern, fallback = null) => text.match(pattern)?.[1] || (fallback ? text.match(fallback)?.[1] || '' : '');
   const signed = (value, ref) => ref && /[SW]/i.test(ref) ? -Math.abs(value) : value;
+  const dateMatch = text.match(/\b(20\d{2})[\/.\-](\d{1,2})[\/.\-](\d{1,2})(?:\s+|T)(\d{1,2}):(\d{2})(?::(\d{2}))?/i) || text.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](20\d{2})(?:\s+|T)(\d{1,2}):(\d{2})(?::(\d{2}))?/i);
+  const capturedAt = dateMatch ? (dateMatch[3]?.startsWith('20') ? new Date(Number(dateMatch[3]), Number(dateMatch[2]) - 1, Number(dateMatch[1]), Number(dateMatch[4]), Number(dateMatch[5]), Number(dateMatch[6] || 0)) : new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]), Number(dateMatch[4]), Number(dateMatch[5]), Number(dateMatch[6] || 0))) : null;
   const gps = GPSLatitude && GPSLongitude ? { latitude: signed(GPSLatitude, GPSLatitudeRef), longitude: signed(GPSLongitude, GPSLongitudeRef) } : null;
   return {
     gps,
+    capturedAt: capturedAt && !Number.isNaN(capturedAt.getTime()) ? capturedAt.toISOString() : null,
     readings: {
       odometerKm: number(/(?:总里程|total\s*mileage|odometer)\s*([0-9]{3,})/i, /\b([0-9]{5,6})\b/),
       rangeKm: number(/(?:range|续航)\s*([0-9]{2,})\s*km/i, /\b([0-9]{2,3})\s*km\b/i),
@@ -56,6 +59,7 @@ function render(items) {
     const milestones = document.createElement('ol'); milestones.className = 'milestones';
     for (const milestone of item.milestones || []) {
       const row = document.createElement('li'); addText(row, milestone.label); addText(row, milestone.type, 'badge');
+      if (milestone.capturedAt) addText(row, `Dashboard time: ${new Date(milestone.capturedAt).toLocaleString()}`, 'metadata');
       if (milestone.gps) addText(row, `GPS ${milestone.gps.latitude}, ${milestone.gps.longitude}`, 'metadata');
       const readings = Object.entries(milestone.readings || {}).filter(([key]) => key !== 'rawText' && milestone.readings[key]);
       if (readings.length) addText(row, readings.map(([key, value]) => `${key}: ${value}`).join(' · '), 'metadata');
@@ -65,7 +69,7 @@ function render(items) {
     card.append(milestones);
 
     const milestoneForm = document.createElement('form'); milestoneForm.className = 'milestone-form';
-    milestoneForm.innerHTML = `<div class="field field-wide"><label for="label-${item.id}">Milestone name</label><input id="label-${item.id}" name="label" required placeholder="e.g. Left home, charging stop"></div><div class="field"><label for="type-${item.id}">Milestone type</label><select id="type-${item.id}" name="type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select></div><div class="field field-wide"><label for="photo-${item.id}">Dashboard photo <span class="muted">(optional)</span></label><input id="photo-${item.id}" name="photo" type="file" aria-label="Dashboard photo document"><small class="muted">Choose an image document, then read it to fill the fields.</small></div><div class="actions"><button type="button" class="extract-photo secondary">Read dashboard photo</button><button type="submit">Save milestone</button></div><div class="reading-fields"><h4>Journey readings <span class="muted">Review or enter manually</span></h4><label>Odometer (km)<input name="odometerKm" inputmode="decimal"></label><label>Battery (%)<input name="batteryPercent" inputmode="decimal"></label><label>Range (km)<input name="rangeKm" inputmode="decimal"></label><label>Speed (km/h)<input name="speedKmh" inputmode="decimal"></label><label>Temperature (°C)<input name="temperatureC" inputmode="decimal"></label><label>Latitude<input name="latitude" inputmode="decimal"></label><label>Longitude<input name="longitude" inputmode="decimal"></label></div><p class="photo-status muted" role="status"></p>`;
+    milestoneForm.innerHTML = `<div class="field field-wide"><label for="label-${item.id}">Milestone name</label><input id="label-${item.id}" name="label" required placeholder="e.g. Left home, charging stop"></div><div class="field"><label for="type-${item.id}">Milestone type</label><select id="type-${item.id}" name="type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select></div><div class="field"><label for="capturedAt-${item.id}">Dashboard timestamp</label><input id="capturedAt-${item.id}" name="capturedAt" type="datetime-local"><small class="muted">Read from dashboard; edit if needed.</small></div><div class="field field-wide"><label for="photo-${item.id}">Dashboard photo <span class="muted">(optional)</span></label><input id="photo-${item.id}" name="photo" type="file" aria-label="Dashboard photo document"><small class="muted">Choose an image document, then read it to fill the fields.</small></div><div class="actions"><button type="button" class="extract-photo secondary">Read dashboard photo</button><button type="submit">Save milestone</button></div><div class="reading-fields"><h4>Journey readings <span class="muted">Review or enter manually</span></h4><label>Odometer (km)<input name="odometerKm" inputmode="decimal"></label><label>Battery (%)<input name="batteryPercent" inputmode="decimal"></label><label>Range (km)<input name="rangeKm" inputmode="decimal"></label><label>Speed (km/h)<input name="speedKmh" inputmode="decimal"></label><label>Temperature (°C)<input name="temperatureC" inputmode="decimal"></label><label>Latitude<input name="latitude" inputmode="decimal"></label><label>Longitude<input name="longitude" inputmode="decimal"></label></div><p class="photo-status muted" role="status"></p>`;
     const photoStatus = milestoneForm.querySelector('.photo-status');
     const photoInput = milestoneForm.querySelector('input[type=file]');
     const setGpsFields = (gps) => { if (gps) { milestoneForm.elements.latitude.value = gps.latitude; milestoneForm.elements.longitude.value = gps.longitude; } };
@@ -79,6 +83,7 @@ function render(items) {
         const extracted = await extractPhoto(photo);
         for (const key of ['odometerKm', 'batteryPercent', 'rangeKm', 'speedKmh', 'temperatureC']) milestoneForm.elements[key].value = extracted.readings[key];
         setGpsFields(extracted.gps || pageGps);
+        if (extracted.capturedAt) milestoneForm.elements.capturedAt.value = extracted.capturedAt.slice(0, 16);
         milestoneForm.dataset.gps = JSON.stringify(extracted.gps || pageGps);
         milestoneForm.dataset.gpsSource = extracted.gps ? 'photo-exif' : (pageGps ? 'device-geolocation' : '');
         milestoneForm.dataset.source = 'dashboard-photo';
@@ -91,7 +96,8 @@ function render(items) {
       const readings = Object.fromEntries(['odometerKm', 'batteryPercent', 'rangeKm', 'speedKmh', 'temperatureC'].map((key) => [key, data.get(key)]).filter(([, value]) => value));
       const latitude = Number(data.get('latitude')); const longitude = Number(data.get('longitude'));
       const gps = Number.isFinite(latitude) && Number.isFinite(longitude) && data.get('latitude') !== '' && data.get('longitude') !== '' ? { latitude, longitude } : null;
-      const response = await fetch(`/api/journeys/${item.id}/milestones`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: data.get('label'), type: data.get('type'), source: milestoneForm.dataset.gpsSource || milestoneForm.dataset.source || 'manual', gps, readings }) });
+      const capturedAt = data.get('capturedAt') ? new Date(data.get('capturedAt')).toISOString() : null;
+      const response = await fetch(`/api/journeys/${item.id}/milestones`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: data.get('label'), type: data.get('type'), capturedAt, source: milestoneForm.dataset.gpsSource || milestoneForm.dataset.source || 'manual', gps, readings }) });
       const result = await response.json(); if (!response.ok) { message.textContent = result.error || 'Unable to add milestone'; return; }
       message.textContent = gps ? `Milestone added with GPS (${milestoneForm.dataset.gpsSource || 'manual'}).` : 'Milestone added; no GPS metadata or device GPS was available.'; await load();
     });

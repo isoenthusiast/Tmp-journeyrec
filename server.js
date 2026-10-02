@@ -26,8 +26,10 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL,
       source TEXT NOT NULL DEFAULT 'manual',
       gps JSONB,
-      readings JSONB NOT NULL DEFAULT '{}'::jsonb
+      readings JSONB NOT NULL DEFAULT '{}'::jsonb,
+      captured_at TIMESTAMPTZ
     );
+    ALTER TABLE milestones ADD COLUMN IF NOT EXISTS captured_at TIMESTAMPTZ;
   `);
 }
 
@@ -41,7 +43,7 @@ async function listJourneys() {
   if (!pool) return memoryJourneys;
   const { rows } = await pool.query(`
     SELECT j.id, j.name, j.created_at AS "createdAt",
-      COALESCE(json_agg(json_build_object('id', m.id, 'label', m.label, 'type', m.type, 'createdAt', m.created_at, 'source', m.source, 'gps', m.gps, 'readings', m.readings) ORDER BY m.created_at) FILTER (WHERE m.id IS NOT NULL), '[]') AS milestones
+      COALESCE(json_agg(json_build_object('id', m.id, 'label', m.label, 'type', m.type, 'createdAt', m.created_at, 'capturedAt', m.captured_at, 'source', m.source, 'gps', m.gps, 'readings', m.readings) ORDER BY COALESCE(m.captured_at, m.created_at)) FILTER (WHERE m.id IS NOT NULL), '[]') AS milestones
     FROM journeys j LEFT JOIN milestones m ON m.journey_id = j.id
     GROUP BY j.id ORDER BY j.created_at DESC
   `);
@@ -76,8 +78,10 @@ const server = createServer(async (req, res) => {
       const input = await readBody(req); const label = String(input.label || '').trim(); const type = String(input.type || 'waypoint').trim().toLowerCase();
       if (!label) return json(res, 400, { error: 'Milestone label is required' });
       if (!['start', 'waypoint', 'end'].includes(type)) return json(res, 400, { error: 'Milestone type must be start, waypoint, or end' });
-      const milestone = { id: crypto.randomUUID(), label, type, createdAt: new Date().toISOString(), source: input.source || 'manual', gps: input.gps || null, readings: input.readings || {} };
-      if (pool) await pool.query('INSERT INTO milestones (id, journey_id, label, type, created_at, source, gps, readings) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [milestone.id, journey.id, milestone.label, milestone.type, milestone.createdAt, milestone.source, milestone.gps, milestone.readings]);
+      const capturedAt = input.capturedAt ? new Date(input.capturedAt) : null;
+      if (capturedAt && Number.isNaN(capturedAt.getTime())) return json(res, 400, { error: 'Dashboard timestamp is invalid' });
+      const milestone = { id: crypto.randomUUID(), label, type, createdAt: new Date().toISOString(), capturedAt: capturedAt?.toISOString() || null, source: input.source || 'manual', gps: input.gps || null, readings: input.readings || {} };
+      if (pool) await pool.query('INSERT INTO milestones (id, journey_id, label, type, created_at, captured_at, source, gps, readings) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [milestone.id, journey.id, milestone.label, milestone.type, milestone.createdAt, milestone.capturedAt, milestone.source, milestone.gps, milestone.readings]);
       else journey.milestones.push(milestone);
       return json(res, 201, milestone);
     }
