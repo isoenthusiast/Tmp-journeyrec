@@ -12,7 +12,7 @@ await new Promise((resolve, reject) => {
 test('health endpoint responds', async () => {
   const response = await fetch(`http://127.0.0.1:${port}/health`);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true });
+  assert.deepEqual(await response.json(), { ok: true, persistent: false });
 });
 
 test('journeys can be created and listed with milestones', async () => {
