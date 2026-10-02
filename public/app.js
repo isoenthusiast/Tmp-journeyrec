@@ -21,20 +21,24 @@ function addText(parent, text, className = '') {
 }
 
 async function extractPhoto(file) {
+  if (!file || !file.size) throw new Error('Choose an image document first.');
+  if (file.type && !file.type.startsWith('image/')) throw new Error('The selected document is not a supported image.');
+  if (!window.Tesseract?.recognize) throw new Error('OCR engine did not load. Check the connection and reload the page.');
+  message.textContent = 'Loading dashboard OCR…';
   const [{ GPSLatitude, GPSLongitude, GPSLatitudeRef, GPSLongitudeRef }, ocr] = await Promise.all([
     import('https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.esm.mjs').then((exifr) => exifr.gps(file).catch(() => ({}))),
     window.Tesseract.recognize(file, 'eng', { logger: (info) => { if (info.status === 'recognizing text') message.textContent = `Reading dashboard: ${Math.round(info.progress * 100)}%`; } })
   ]);
   const text = ocr.data.text.replace(/\s+/g, ' ');
-  const number = (pattern) => text.match(pattern)?.[1] || '';
+  const number = (pattern, fallback = null) => text.match(pattern)?.[1] || (fallback ? text.match(fallback)?.[1] || '' : '');
   const signed = (value, ref) => ref && /[SW]/i.test(ref) ? -Math.abs(value) : value;
   const gps = GPSLatitude && GPSLongitude ? { latitude: signed(GPSLatitude, GPSLatitudeRef), longitude: signed(GPSLongitude, GPSLongitudeRef) } : null;
   return {
     gps,
     readings: {
-      odometerKm: number(/(?:总里程|total\s*mileage|odometer)\s*([0-9]{3,})/i),
-      rangeKm: number(/(?:range|续航)\s*([0-9]{2,})\s*km/i),
-      batteryPercent: number(/(?:battery|电量)\s*([0-9]{1,3})\s*%/i),
+      odometerKm: number(/(?:总里程|total\s*mileage|odometer)\s*([0-9]{3,})/i, /\b([0-9]{5,6})\b/),
+      rangeKm: number(/(?:range|续航)\s*([0-9]{2,})\s*km/i, /\b([0-9]{2,3})\s*km\b/i),
+      batteryPercent: number(/(?:battery|电量)\s*([0-9]{1,3})\s*%/i, /\b([0-9]{1,3})\s*%/),
       speedKmh: number(/([0-9]{1,3})\s*km\/h/i),
       temperatureC: number(/([0-9]{1,2})\s*°?c/i),
       rawText: text
@@ -61,7 +65,7 @@ function render(items) {
     card.append(milestones);
 
     const milestoneForm = document.createElement('form'); milestoneForm.className = 'milestone-form';
-    milestoneForm.innerHTML = `<input name="label" required placeholder="Milestone name"><select name="type" aria-label="Milestone type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select><input name="photo" type="file" accept="image/*" aria-label="Dashboard photo"><button type="button" class="extract-photo">Read photo</button><button type="submit">Save milestone</button><div class="reading-fields"><label>Odometer km <input name="odometerKm" inputmode="decimal"></label><label>Battery % <input name="batteryPercent" inputmode="decimal"></label><label>Range km <input name="rangeKm" inputmode="decimal"></label><label>Speed km/h <input name="speedKmh" inputmode="decimal"></label><label>Temperature °C <input name="temperatureC" inputmode="decimal"></label><label>Latitude <input name="latitude" inputmode="decimal"></label><label>Longitude <input name="longitude" inputmode="decimal"></label></div><p class="photo-status muted"></p>`;
+    milestoneForm.innerHTML = `<input name="label" required placeholder="Milestone name"><select name="type" aria-label="Milestone type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select><input name="photo" type="file" aria-label="Dashboard photo document"><button type="button" class="extract-photo">Read photo</button><button type="submit">Save milestone</button><div class="reading-fields"><label>Odometer km <input name="odometerKm" inputmode="decimal"></label><label>Battery % <input name="batteryPercent" inputmode="decimal"></label><label>Range km <input name="rangeKm" inputmode="decimal"></label><label>Speed km/h <input name="speedKmh" inputmode="decimal"></label><label>Temperature °C <input name="temperatureC" inputmode="decimal"></label><label>Latitude <input name="latitude" inputmode="decimal"></label><label>Longitude <input name="longitude" inputmode="decimal"></label></div><p class="photo-status muted"></p>`;
     const photoStatus = milestoneForm.querySelector('.photo-status');
     const photoInput = milestoneForm.querySelector('input[type=file]');
     const setGpsFields = (gps) => { if (gps) { milestoneForm.elements.latitude.value = gps.latitude; milestoneForm.elements.longitude.value = gps.longitude; } };
