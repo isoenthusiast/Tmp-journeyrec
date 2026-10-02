@@ -9,13 +9,13 @@
 <body>
   <main>
     <h1>Temporary Journey Tracker</h1>
-    <p class="muted">Record a journey while the permanent tracker is being built.</p>
+    <p class="muted">Record a journey and its start, waypoint, and end milestones.</p>
     <form id="journey-form">
       <label for="name">Journey name</label>
       <div class="row"><input id="name" name="name" required placeholder="e.g. Home to office"><button>Add journey</button></div>
       <p id="message" role="status"></p>
     </form>
-    <section><h2>Journeys</h2><ul id="journeys"><li class="muted">Loading…</li></ul></section>
+    <section><h2>Journeys</h2><div id="journeys"><p class="muted">Loading…</p></div></section>
   </main>
   <script src="/app.js" type="module"></script>
 </body>

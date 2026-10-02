@@ -15,13 +15,37 @@ test('health endpoint responds', async () => {
   assert.deepEqual(await response.json(), { ok: true });
 });
 
-test('journeys can be created and listed', async () => {
+test('journeys can be created and listed with milestones', async () => {
   const created = await fetch(`http://127.0.0.1:${port}/api/journeys`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Test trip' })
   });
   assert.equal(created.status, 201);
+  const journey = await created.json();
+  assert.deepEqual(journey.milestones, []);
+
+  const milestone = await fetch(`http://127.0.0.1:${port}/api/journeys/${journey.id}/milestones`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ label: 'Home', type: 'start' })
+  });
+  assert.equal(milestone.status, 201);
+  assert.equal((await milestone.json()).type, 'start');
+
   const list = await fetch(`http://127.0.0.1:${port}/api/journeys`);
-  assert.equal((await list.json())[0].name, 'Test trip');
+  const listed = await list.json();
+  assert.equal(listed[0].name, 'Test trip');
+  assert.equal(listed[0].milestones[0].label, 'Home');
+});
+
+test('milestone validation rejects invalid types', async () => {
+  const created = await fetch(`http://127.0.0.1:${port}/api/journeys`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Validation trip' })
+  });
+  const journey = await created.json();
+  const response = await fetch(`http://127.0.0.1:${port}/api/journeys/${journey.id}/milestones`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ label: 'Unknown', type: 'invalid' })
+  });
+  assert.equal(response.status, 400);
 });
 
 test.after(() => child.kill());

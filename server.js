@@ -31,12 +31,40 @@ const server = createServer(async (req, res) => {
       const input = JSON.parse(body || '{}');
       const name = String(input.name || '').trim();
       if (!name) return json(res, 400, { error: 'Journey name is required' });
-      const journey = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString() };
+      const journey = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString(), milestones: [] };
       journeys.unshift(journey);
       return json(res, 201, journey);
     } catch {
       return json(res, 400, { error: 'Request body must be valid JSON' });
     }
+  }
+
+  const milestoneMatch = url.pathname.match(/^\/api\/journeys\/([^/]+)\/milestones$/);
+  if (milestoneMatch && req.method === 'POST') {
+    const journey = journeys.find((item) => item.id === milestoneMatch[1]);
+    if (!journey) return json(res, 404, { error: 'Journey not found' });
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const input = JSON.parse(body || '{}');
+      const label = String(input.label || '').trim();
+      const type = String(input.type || 'waypoint').trim().toLowerCase();
+      if (!label) return json(res, 400, { error: 'Milestone label is required' });
+      if (!['start', 'waypoint', 'end'].includes(type)) {
+        return json(res, 400, { error: 'Milestone type must be start, waypoint, or end' });
+      }
+      const milestone = { id: crypto.randomUUID(), label, type, createdAt: new Date().toISOString() };
+      journey.milestones.push(milestone);
+      return json(res, 201, milestone);
+    } catch {
+      return json(res, 400, { error: 'Request body must be valid JSON' });
+    }
+  }
+
+  if (milestoneMatch && req.method === 'GET') {
+    const journey = journeys.find((item) => item.id === milestoneMatch[1]);
+    if (!journey) return json(res, 404, { error: 'Journey not found' });
+    return json(res, 200, journey.milestones);
   }
 
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {

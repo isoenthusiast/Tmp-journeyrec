@@ -10,3 +10,11 @@ input { flex: 1; min-width: 0; padding: .75rem; border: 1px solid #566681; borde
 button { padding: .75rem 1rem; border: 0; border-radius: 8px; background: #6d8cff; color: white; cursor: pointer; }
 ul { padding-left: 1.25rem; }
 li { margin: .8rem 0; }
+article { margin: 1rem 0; padding: 1rem; border: 1px solid #33415d; border-radius: 10px; }
+h3 { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0; }
+.timestamp { font-size: .8rem; font-weight: normal; }
+.milestones { padding-left: 1.5rem; }
+.milestone-form { display: flex; gap: .5rem; margin-top: 1rem; }
+.milestone-form input { min-width: 0; }
+select { padding: .75rem; border: 1px solid #566681; border-radius: 8px; background: #0f1727; color: inherit; }
+.badge { margin-left: .5rem; padding: .15rem .45rem; border-radius: 999px; background: #33415d; font-size: .75rem; }
