@@ -1,25 +1,42 @@
-:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+:root { color-scheme: light dark; font-family: system-ui, -apple-system, sans-serif; }
+* { box-sizing: border-box; }
 body { margin: 0; background: #101827; color: #f5f7fb; }
-main { max-width: 760px; margin: 4rem auto; padding: 0 1.25rem; }
-h1 { margin-bottom: .4rem; }
+main { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+h1 { margin-bottom: .4rem; font-size: clamp(2rem, 7vw, 3.2rem); }
+h2 { margin: 0 0 1rem; }
+h3 { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 0; }
+h4 { grid-column: 1 / -1; margin: 0; font-size: 1.05rem; }
 .muted { color: #aab5c8; }
-form, section { margin-top: 2rem; padding: 1.25rem; border: 1px solid #33415d; border-radius: 12px; background: #182338; }
-label, h2 { display: block; margin-bottom: .75rem; }
-.row { display: flex; gap: .75rem; }
-input { flex: 1; min-width: 0; padding: .75rem; border: 1px solid #566681; border-radius: 8px; background: #0f1727; color: inherit; }
-button { padding: .75rem 1rem; border: 0; border-radius: 8px; background: #6d8cff; color: white; cursor: pointer; }
-ul { padding-left: 1.25rem; }
-li { margin: .8rem 0; }
-article { margin: 1rem 0; padding: 1rem; border: 1px solid #33415d; border-radius: 10px; }
-h3 { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0; }
+form, section { margin-top: 1.5rem; padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid #33415d; border-radius: 14px; background: #182338; }
+#journey-form .row { display: grid; grid-template-columns: 1fr auto; gap: .75rem; }
+label { display: block; margin-bottom: .4rem; color: #dce5f5; font-weight: 600; }
+input, select { width: 100%; min-width: 0; padding: .8rem; border: 1px solid #566681; border-radius: 8px; background: #0f1727; color: inherit; font: inherit; }
+input[type=file] { padding: .65rem; }
+button { min-height: 46px; padding: .75rem 1rem; border: 0; border-radius: 8px; background: #6d8cff; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+button:hover { background: #86a0ff; }
+button:disabled { opacity: .55; cursor: wait; }
+button.secondary { background: #334f8d; }
+small { display: block; margin-top: .4rem; }
+article { margin: 1rem 0; padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid #33415d; border-radius: 10px; }
 .timestamp { font-size: .8rem; font-weight: normal; }
 .milestones { padding-left: 1.5rem; }
-.milestone-form { display: flex; gap: .5rem; margin-top: 1rem; }
-.milestone-form input { min-width: 0; }
-select { padding: .75rem; border: 1px solid #566681; border-radius: 8px; background: #0f1727; color: inherit; }
+.milestones li { margin: .8rem 0; }
 .badge { margin-left: .5rem; padding: .15rem .45rem; border-radius: 999px; background: #33415d; font-size: .75rem; }
 .metadata { display: block; margin-top: .25rem; color: #b6c7e6; font-size: .85rem; }
-.photo-status { flex-basis: 100%; margin: 0; }
-.reading-fields { display: flex; flex-wrap: wrap; gap: .5rem; flex-basis: 100%; }
-.reading-fields label { margin: 0; font-size: .8rem; color: #b6c7e6; }
-.reading-fields input { width: 6rem; display: block; margin-top: .25rem; }
+.milestone-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, .45fr); gap: 1rem; margin-top: 1.25rem; padding: 1rem; background: #111b2d; }
+.field-wide, .actions, .reading-fields, .photo-status { grid-column: 1 / -1; }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.actions button { flex: 1 1 190px; }
+.reading-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; padding-top: .25rem; }
+.reading-fields h4 { margin-bottom: .1rem; }
+.reading-fields h4 .muted { font-size: .8rem; font-weight: normal; }
+.reading-fields label { font-size: .85rem; }
+.reading-fields input { margin-top: .2rem; }
+.photo-status { margin: 0; min-height: 1.3rem; }
+@media (max-width: 560px) {
+  main { margin: 1rem auto; }
+  #journey-form .row, .milestone-form, .reading-fields { grid-template-columns: 1fr; }
+  .field-wide, .actions, .reading-fields, .photo-status { grid-column: auto; }
+  .actions { display: grid; grid-template-columns: 1fr; }
+  .actions button { width: 100%; }
+}
