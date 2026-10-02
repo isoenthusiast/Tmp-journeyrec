@@ -11,6 +11,6 @@ npm test
 npm start
 ```
 
-Open http://localhost:3000. The app exposes `GET /health`, `GET /api/journeys`, and `POST /api/journeys`.
+Open http://localhost:3000. The app exposes `GET /health`, `GET /api/journeys`, `POST /api/journeys`, `GET /api/journeys/:id/milestones`, and `POST /api/journeys/:id/milestones`. Milestones accept `start`, `waypoint`, or `end` types.
 
 Journey data is held in process memory and is intentionally non-persistent for this temporary app. Railway supplies the `PORT` environment variable at runtime.
