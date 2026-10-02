@@ -20,21 +20,30 @@ function addText(parent, text, className = '') {
   return element;
 }
 
+function parseExifDate(value) {
+  if (value instanceof Date) return value;
+  const match = String(value).match(/^(\d{4})[:\/-](\d{2})[:\/-](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return new Date(value);
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] || 0));
+}
+
 async function extractPhoto(file) {
   if (!file || !file.size) throw new Error('Choose an image document first.');
   if (file.type && !file.type.startsWith('image/')) throw new Error('The selected document is not a supported image.');
   if (!window.Tesseract?.recognize) throw new Error('OCR engine did not load. Check the connection and reload the page.');
   message.textContent = 'Loading dashboard OCR…';
-  const [{ GPSLatitude, GPSLongitude, GPSLatitudeRef, GPSLongitudeRef }, ocr] = await Promise.all([
-    import('https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.esm.mjs').then((exifr) => exifr.gps(file).catch(() => ({}))),
+  const [exifr, ocr] = await Promise.all([
+    import('https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.esm.mjs'),
     window.Tesseract.recognize(file, 'eng', { logger: (info) => { if (info.status === 'recognizing text') message.textContent = `Reading dashboard: ${Math.round(info.progress * 100)}%`; } })
   ]);
+  const metadata = await exifr.parse(file, { tiff: true, exif: true, gps: true }).catch(() => ({}));
+  const { GPSLatitude, GPSLongitude, GPSLatitudeRef, GPSLongitudeRef } = metadata;
   const text = ocr.data.text.replace(/\s+/g, ' ');
   const number = (pattern, fallback = null) => text.match(pattern)?.[1] || (fallback ? text.match(fallback)?.[1] || '' : '');
   const signed = (value, ref) => ref && /[SW]/i.test(ref) ? -Math.abs(value) : value;
-  const dateMatch = text.match(/\b(20\d{2})[\/.\-](\d{1,2})[\/.\-](\d{1,2})(?:\s+|T)(\d{1,2}):(\d{2})(?::(\d{2}))?/i) || text.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](20\d{2})(?:\s+|T)(\d{1,2}):(\d{2})(?::(\d{2}))?/i);
-  const capturedAt = dateMatch ? (dateMatch[3]?.startsWith('20') ? new Date(Number(dateMatch[3]), Number(dateMatch[2]) - 1, Number(dateMatch[1]), Number(dateMatch[4]), Number(dateMatch[5]), Number(dateMatch[6] || 0)) : new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]), Number(dateMatch[4]), Number(dateMatch[5]), Number(dateMatch[6] || 0))) : null;
   const gps = GPSLatitude && GPSLongitude ? { latitude: signed(GPSLatitude, GPSLatitudeRef), longitude: signed(GPSLongitude, GPSLongitudeRef) } : null;
+  const exifDate = metadata.DateTimeOriginal || metadata.CreateDate || metadata.ModifyDate || null;
+  const capturedAt = exifDate ? parseExifDate(exifDate) : null;
   return {
     gps,
     capturedAt: capturedAt && !Number.isNaN(capturedAt.getTime()) ? capturedAt.toISOString() : null,
@@ -69,7 +78,7 @@ function render(items) {
     card.append(milestones);
 
     const milestoneForm = document.createElement('form'); milestoneForm.className = 'milestone-form';
-    milestoneForm.innerHTML = `<div class="field field-wide"><label for="label-${item.id}">Milestone name</label><input id="label-${item.id}" name="label" required placeholder="e.g. Left home, charging stop"></div><div class="field"><label for="type-${item.id}">Milestone type</label><select id="type-${item.id}" name="type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select></div><div class="field"><label for="capturedAt-${item.id}">Dashboard timestamp</label><input id="capturedAt-${item.id}" name="capturedAt" type="datetime-local"><small class="muted">Read from dashboard; edit if needed.</small></div><div class="field field-wide"><label for="photo-${item.id}">Dashboard photo <span class="muted">(optional)</span></label><input id="photo-${item.id}" name="photo" type="file" aria-label="Dashboard photo document"><small class="muted">Choose an image document, then read it to fill the fields.</small></div><div class="actions"><button type="button" class="extract-photo secondary">Read dashboard photo</button><button type="submit">Save milestone</button></div><div class="reading-fields"><h4>Journey readings <span class="muted">Review or enter manually</span></h4><label>Odometer (km)<input name="odometerKm" inputmode="decimal"></label><label>Battery (%)<input name="batteryPercent" inputmode="decimal"></label><label>Range (km)<input name="rangeKm" inputmode="decimal"></label><label>Speed (km/h)<input name="speedKmh" inputmode="decimal"></label><label>Temperature (°C)<input name="temperatureC" inputmode="decimal"></label><label>Latitude<input name="latitude" inputmode="decimal"></label><label>Longitude<input name="longitude" inputmode="decimal"></label></div><p class="photo-status muted" role="status"></p>`;
+    milestoneForm.innerHTML = `<div class="field field-wide"><label for="label-${item.id}">Milestone name</label><input id="label-${item.id}" name="label" required placeholder="e.g. Left home, charging stop"></div><div class="field"><label for="type-${item.id}">Milestone type</label><select id="type-${item.id}" name="type"><option value="start">Start</option><option value="waypoint" selected>Waypoint</option><option value="end">End</option></select></div><div class="field"><label for="capturedAt-${item.id}">Dashboard timestamp (EXIF)</label><input id="capturedAt-${item.id}" name="capturedAt" type="datetime-local"><small class="muted">Read from dashboard; edit if needed.</small></div><div class="field field-wide"><label for="photo-${item.id}">Dashboard photo <span class="muted">(optional)</span></label><input id="photo-${item.id}" name="photo" type="file" aria-label="Dashboard photo document"><small class="muted">Choose an image document, then read it to fill the fields.</small></div><div class="actions"><button type="button" class="extract-photo secondary">Read dashboard photo</button><button type="submit">Save milestone</button></div><div class="reading-fields"><h4>Journey readings <span class="muted">Review or enter manually</span></h4><label>Odometer (km)<input name="odometerKm" inputmode="decimal"></label><label>Battery (%)<input name="batteryPercent" inputmode="decimal"></label><label>Range (km)<input name="rangeKm" inputmode="decimal"></label><label>Speed (km/h)<input name="speedKmh" inputmode="decimal"></label><label>Temperature (°C)<input name="temperatureC" inputmode="decimal"></label><label>Latitude<input name="latitude" inputmode="decimal"></label><label>Longitude<input name="longitude" inputmode="decimal"></label></div><p class="photo-status muted" role="status"></p>`;
     const photoStatus = milestoneForm.querySelector('.photo-status');
     const photoInput = milestoneForm.querySelector('input[type=file]');
     const setGpsFields = (gps) => { if (gps) { milestoneForm.elements.latitude.value = gps.latitude; milestoneForm.elements.longitude.value = gps.longitude; } };
@@ -87,7 +96,7 @@ function render(items) {
         milestoneForm.dataset.gps = JSON.stringify(extracted.gps || pageGps);
         milestoneForm.dataset.gpsSource = extracted.gps ? 'photo-exif' : (pageGps ? 'device-geolocation' : '');
         milestoneForm.dataset.source = 'dashboard-photo';
-        photoStatus.textContent = extracted.gps ? `GPS found in photo metadata: ${extracted.gps.latitude}, ${extracted.gps.longitude}. Review readings, then save.` : (pageGps ? 'No photo GPS metadata; using current device GPS. Review fields, then save.' : 'No GPS metadata or device GPS found. Review fields, then save.');
+        photoStatus.textContent = `${extracted.capturedAt ? 'Dashboard timestamp read from EXIF. ' : 'No EXIF dashboard timestamp found. '} ${extracted.gps ? `GPS found in photo metadata: ${extracted.gps.latitude}, ${extracted.gps.longitude}.` : (pageGps ? 'No photo GPS metadata; using current device GPS.' : 'No GPS metadata or device GPS found.')} Review readings, then save.`;
       } catch (error) { photoStatus.textContent = `Photo extraction failed: ${error.message}`; } finally { extractButton.disabled = false; }
     });
     photoInput.addEventListener('change', () => { milestoneForm.dataset.gps = ''; milestoneForm.dataset.source = ''; photoStatus.textContent = 'Photo selected. Press Read photo.'; });
