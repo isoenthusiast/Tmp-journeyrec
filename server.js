@@ -53,7 +53,15 @@ const server = createServer(async (req, res) => {
       if (!['start', 'waypoint', 'end'].includes(type)) {
         return json(res, 400, { error: 'Milestone type must be start, waypoint, or end' });
       }
-      const milestone = { id: crypto.randomUUID(), label, type, createdAt: new Date().toISOString() };
+      const milestone = {
+        id: crypto.randomUUID(),
+        label,
+        type,
+        createdAt: new Date().toISOString(),
+        source: input.source || 'manual',
+        gps: input.gps || null,
+        readings: input.readings || {}
+      };
       journey.milestones.push(milestone);
       return json(res, 201, milestone);
     } catch {
